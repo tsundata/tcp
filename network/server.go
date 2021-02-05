@@ -2,6 +2,7 @@ package network
 
 import (
 	"fmt"
+	"github.com/tsundata/tcp/utils"
 	"log"
 	"net"
 )
@@ -23,11 +24,12 @@ type Server struct {
 }
 
 func NewServer(name string) IServer {
+	utils.Setting.Reload()
 	return &Server{
-		Name:      name,
+		Name:      utils.Setting.Name,
 		IPVersion: "tcp4",
-		IP:        "0.0.0.0",
-		Port:      5678,
+		IP:        utils.Setting.Host,
+		Port:      utils.Setting.TCPPort,
 	}
 }
 
@@ -42,7 +44,12 @@ func CallbackToClient(conn *net.TCPConn, data []byte, cnt int) error {
 }
 
 func (s *Server) Start() {
-	log.Printf("[TS] server starting... %s:%d", s.IP, s.Port)
+	log.Printf("[TS] server starting...%s %s:%d", s.Name, s.IP, s.Port)
+	log.Printf("[TS] version: %s maxConn: %d maxPacketSize: %d",
+		utils.Setting.Version,
+		utils.Setting.MaxConn,
+		utils.Setting.MaxPacketSize,
+	)
 	go func() {
 		addr, err := net.ResolveTCPAddr(s.IPVersion, fmt.Sprintf("%s:%d", s.IP, s.Port))
 		if err != nil {
