@@ -10,6 +10,7 @@ type IServer interface {
 	Start()
 	Stop()
 	Serve()
+	AddRouter(router IRouter)
 }
 
 type Server struct {
@@ -17,6 +18,8 @@ type Server struct {
 	IPVersion string
 	IP        string
 	Port      int
+
+	Router IRouter
 }
 
 func NewServer(name string) IServer {
@@ -62,7 +65,7 @@ func (s *Server) Start() {
 				continue
 			}
 
-			dealConn := NewConnection(conn, cid, CallbackToClient)
+			dealConn := NewConnection(conn, cid, s.Router)
 			cid++
 
 			go dealConn.Start()
@@ -78,4 +81,9 @@ func (s *Server) Serve() {
 	s.Start()
 
 	select {}
+}
+
+func (s *Server) AddRouter(r IRouter) {
+	s.Router = r
+	log.Println("add router success")
 }

@@ -21,16 +21,17 @@ type Connection struct {
 	ConnID   uint32
 	isClosed bool
 
-	handleAPI    HandFunc
+	Router IRouter
+
 	ExitBuffChan chan bool
 }
 
-func NewConnection(conn *net.TCPConn, connID uint32, handleAPI HandFunc) *Connection {
+func NewConnection(conn *net.TCPConn, connID uint32, r IRouter) *Connection {
 	return &Connection{
 		Conn:         conn,
 		ConnID:       connID,
-		handleAPI:    handleAPI,
 		isClosed:     false,
+		Router:       r,
 		ExitBuffChan: make(chan bool, 1),
 	}
 }
@@ -42,17 +43,22 @@ func (c *Connection) StartReader() {
 
 	for {
 		buf := make([]byte, 512)
-		cnt, err := c.Conn.Read(buf)
+		_, err := c.Conn.Read(buf)
 		if err != nil {
 			log.Println("recv buf err ", err)
 			c.ExitBuffChan <- true
 			continue
 		}
-		if err := c.handleAPI(c.Conn, buf, cnt); err != nil {
-			log.Println("connID ", c.ConnID, " handle is error")
-			c.ExitBuffChan <- true
-			return
+
+		req := Request{
+			conn: c,
+			data: buf,
 		}
+		go func(req IRequest) {
+			c.Router.BeforeHook(req)
+			c.Router.Handle(req)
+			c.Router.AfterHook(req)
+		}(&req)
 	}
 }
 
