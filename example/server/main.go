@@ -11,7 +11,7 @@ type PingRouter struct {
 
 func (r *PingRouter) BeforeHook(req network.IRequest) {
 	log.Println("call router BeforeHook")
-	_, err := req.GetConnection().GetTCPConnection().Write([]byte("before hook\n"))
+	err := req.GetConnection().SendMessage(1, []byte("before hook\n"))
 	if err != nil {
 		log.Println(err)
 	}
@@ -19,7 +19,7 @@ func (r *PingRouter) BeforeHook(req network.IRequest) {
 
 func (r *PingRouter) Handle(req network.IRequest) {
 	log.Println("call router Handle")
-	_, err := req.GetConnection().GetTCPConnection().Write([]byte("handle\n"))
+	err := req.GetConnection().SendMessage(2, []byte("handle\n"))
 	if err != nil {
 		log.Println(err)
 	}
@@ -27,7 +27,7 @@ func (r *PingRouter) Handle(req network.IRequest) {
 
 func (r *PingRouter) AfterHook(req network.IRequest) {
 	log.Println("call router AfterHook")
-	_, err := req.GetConnection().GetTCPConnection().Write([]byte("after hook\n"))
+	err := req.GetConnection().SendMessage(3, []byte("after hook\n"))
 	if err != nil {
 		log.Println(err)
 	}

@@ -7,7 +7,7 @@ type IRequest interface {
 
 type Request struct {
 	conn IConnection
-	data []byte
+	data IMessage
 }
 
 func (r Request) GetConnection() IConnection {
@@ -15,5 +15,9 @@ func (r Request) GetConnection() IConnection {
 }
 
 func (r Request) GetData() []byte {
-	return r.data
+	return r.data.GetData()
+}
+
+func (r *Request) GetMessageID() uint32 {
+	return r.data.GetID()
 }

@@ -1,7 +1,9 @@
 package network
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 )
@@ -12,6 +14,7 @@ type IConnection interface {
 	GetTCPConnection() *net.TCPConn
 	GetConnID() uint32
 	RemoteAddr() net.Addr
+	SendMessage(uint32, []byte) error
 }
 
 type HandFunc func(*net.TCPConn, []byte, int) error
@@ -42,17 +45,36 @@ func (c *Connection) StartReader() {
 	defer c.Stop()
 
 	for {
-		buf := make([]byte, 512)
-		_, err := c.Conn.Read(buf)
-		if err != nil {
-			log.Println("recv buf err ", err)
+		pack := NewPack()
+
+		headData := make([]byte, pack.GetHeadLen())
+		if _, err := io.ReadFull(c.GetTCPConnection(), headData); err != nil {
+			log.Println("read message head error ", err)
 			c.ExitBuffChan <- true
 			continue
 		}
 
+		msg, err := pack.Unpack(headData)
+		if err != nil {
+			log.Println("unpack error ", err)
+			c.ExitBuffChan <- true
+			continue
+		}
+
+		var data []byte
+		if msg.GetDataLen() > 0 {
+			data = make([]byte, msg.GetDataLen())
+			if _, err := io.ReadFull(c.GetTCPConnection(), data); err != nil {
+				log.Println("read message data error ", err)
+				c.ExitBuffChan <- true
+				continue
+			}
+		}
+		msg.SetData(data)
+
 		req := Request{
 			conn: c,
-			data: buf,
+			data: msg,
 		}
 		go func(req IRequest) {
 			c.Router.BeforeHook(req)
@@ -100,4 +122,24 @@ func (c *Connection) GetConnID() uint32 {
 
 func (c *Connection) RemoteAddr() net.Addr {
 	return c.Conn.RemoteAddr()
+}
+
+func (c *Connection) SendMessage(id uint32, data []byte) error {
+	if c.isClosed {
+		return errors.New("connection closed when send message")
+	}
+
+	pack := NewPack()
+	msg, err := pack.Pack(NewMessage(id, data))
+	if err != nil {
+		log.Println("pack error message id = ", id)
+		return errors.New("pack error message")
+	}
+
+	if _, err := c.Conn.Write(msg); err != nil {
+		log.Println("write message id ", id, " error")
+		c.ExitBuffChan <- true
+		return errors.New("conn write error")
+	}
+	return nil
 }
