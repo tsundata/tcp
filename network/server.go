@@ -6,7 +6,7 @@ import (
 	"net"
 )
 
-type ServerInterface interface {
+type IServer interface {
 	Start()
 	Stop()
 	Serve()
@@ -19,13 +19,23 @@ type Server struct {
 	Port      int
 }
 
-func NewServer(name string) *Server {
+func NewServer(name string) IServer {
 	return &Server{
 		Name:      name,
 		IPVersion: "tcp4",
 		IP:        "0.0.0.0",
 		Port:      5678,
 	}
+}
+
+func CallbackToClient(conn *net.TCPConn, data []byte, cnt int) error {
+	log.Printf("[TS] conn handle...")
+	_, err := conn.Write(data[:cnt])
+	if err != nil {
+		log.Println("write back buf err ", err)
+		return err
+	}
+	return nil
 }
 
 func (s *Server) Start() {
@@ -41,29 +51,21 @@ func (s *Server) Start() {
 			log.Println(err)
 			return
 		}
+
+		var cid uint32
+		cid = 0
+
 		for {
 			conn, err := lis.AcceptTCP()
 			if err != nil {
 				log.Println(err)
 				continue
 			}
-			// demo
-			go func(conn net.Conn) {
-				for {
-					buf := make([]byte, 512)
-					cnt, err := conn.Read(buf)
-					if err != nil {
-						log.Println("recv buf err ", err)
-						continue
-					}
-					log.Printf("recv data %s %d\n", buf, cnt)
-					_, err = conn.Write(buf[:cnt])
-					if err != nil {
-						log.Println("write back buf err ", err)
-						continue
-					}
-				}
-			}(conn)
+
+			dealConn := NewConnection(conn, cid, CallbackToClient)
+			cid++
+
+			go dealConn.Start()
 		}
 	}()
 }
