@@ -26,6 +26,7 @@ type Connection struct {
 
 	messageHandler IMessageHandle
 	ExitBuffChan   chan bool
+	messageChan    chan []byte
 }
 
 func NewConnection(conn *net.TCPConn, connID uint32, h IMessageHandle) *Connection {
@@ -35,6 +36,7 @@ func NewConnection(conn *net.TCPConn, connID uint32, h IMessageHandle) *Connecti
 		isClosed:       false,
 		messageHandler: h,
 		ExitBuffChan:   make(chan bool, 1),
+		messageChan:    make(chan []byte),
 	}
 }
 
@@ -79,8 +81,26 @@ func (c *Connection) StartReader() {
 	}
 }
 
+func (c *Connection) StartWriter()  {
+	log.Println("writer goroutine is running")
+	defer log.Println(c.RemoteAddr(), " conn writer exit")
+
+	for {
+		select {
+		case data := <-c.messageChan:
+			if _, err := c.Conn.Write(data); err != nil {
+				log.Println("send data error ", err, " conn writer exit")
+				return
+			}
+		case <-c.ExitBuffChan:
+			return
+		}
+	}
+}
+
 func (c *Connection) Start() {
 	go c.StartReader()
+	go c.StartWriter()
 
 	for {
 		select {
@@ -131,10 +151,8 @@ func (c *Connection) SendMessage(id uint32, data []byte) error {
 		return errors.New("pack error message")
 	}
 
-	if _, err := c.Conn.Write(msg); err != nil {
-		log.Println("write message id ", id, " error")
-		c.ExitBuffChan <- true
-		return errors.New("conn write error")
-	}
+	// write
+	c.messageChan <- msg
+
 	return nil
 }
