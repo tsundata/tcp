@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/tsundata/tcp/network"
 	"log"
 )
@@ -29,16 +30,23 @@ func (r *HelloRouter) Handle(req network.IRequest) {
 	}
 }
 
-func DoConnBegin(conn network.IConnection)  {
+func DoConnBegin(conn network.IConnection) {
 	log.Println("DoConnBegin ...")
+
+	log.Println("set conn name")
+	conn.SetProperty("name", "demo")
+
 	err := conn.SendMessage(2, []byte("DoConnBegin..."))
 	if err != nil {
 		log.Println(err)
 	}
 }
 
-func DoConnLost(conn network.IConnection)  {
+func DoConnLost(conn network.IConnection) {
 	log.Println("DoConnLost ...")
+	if name, err := conn.GetProperty("name"); err == nil {
+		fmt.Println("conn property name = ", name)
+	}
 }
 
 func main() {

@@ -7,16 +7,23 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync"
 )
 
 type IConnection interface {
 	Start()
 	Stop()
+
 	GetTCPConnection() *net.TCPConn
 	GetConnID() uint32
 	RemoteAddr() net.Addr
+
 	SendMessage(uint32, []byte) error
 	SendBuffMessage(uint32, []byte) error
+
+	SetProperty(string, interface{})
+	GetProperty(string) (interface{}, error)
+	RemoveProperty(string)
 }
 
 type HandFunc func(*net.TCPConn, []byte, int) error
@@ -31,6 +38,9 @@ type Connection struct {
 	ExitBuffChan    chan bool
 	messageChan     chan []byte
 	messageBuffChan chan []byte
+
+	property     map[string]interface{}
+	propertyLock *sync.RWMutex
 }
 
 func NewConnection(server IServer, conn *net.TCPConn, connID uint32, h IMessageHandle) *Connection {
@@ -43,6 +53,8 @@ func NewConnection(server IServer, conn *net.TCPConn, connID uint32, h IMessageH
 		ExitBuffChan:    make(chan bool, 1),
 		messageChan:     make(chan []byte),
 		messageBuffChan: make(chan []byte, utils.Setting.MaxMessageChanLen),
+		property:        make(map[string]interface{}),
+		propertyLock:    &sync.RWMutex{},
 	}
 	c.TCPServer.GetConnManager().Add(c)
 	return c
@@ -204,4 +216,29 @@ func (c *Connection) SendBuffMessage(id uint32, data []byte) error {
 	c.messageBuffChan <- msg
 
 	return nil
+}
+
+func (c *Connection) SetProperty(key string, value interface{}) {
+	c.propertyLock.Lock()
+	defer c.propertyLock.Unlock()
+
+	c.property[key] = value
+}
+
+func (c *Connection) GetProperty(key string) (interface{}, error) {
+	c.propertyLock.RLock()
+	defer c.propertyLock.RUnlock()
+
+	if value, ok := c.property[key]; ok {
+		return value, nil
+	} else {
+		return nil, errors.New("no property found")
+	}
+}
+
+func (c *Connection) RemoveProperty(key string) {
+	c.propertyLock.Lock()
+	defer c.propertyLock.Unlock()
+
+	delete(c.property, key)
 }

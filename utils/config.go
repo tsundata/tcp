@@ -39,7 +39,7 @@ func init() {
 		TCPPort:           5678,
 		Version:           "v0.1",
 		MaxPacketSize:     4096,
-		MaxConn:           2,
+		MaxConn:           1000,
 		WorkerPoolSize:    10,
 		MaxWorkerTaskLen:  1024,
 		MaxMessageChanLen: 1024,
