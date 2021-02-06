@@ -3,6 +3,7 @@ package network
 type IRequest interface {
 	GetConnection() IConnection
 	GetData() []byte
+	GetMessageID() uint32
 }
 
 type Request struct {

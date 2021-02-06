@@ -17,7 +17,7 @@ func main() {
 	for {
 		// write
 		pack := network.NewPack()
-		msg, _ := pack.Pack(network.NewMessage(0, []byte(time.Now().String())))
+		msg, _ := pack.Pack(network.NewMessage(1, []byte(time.Now().String())))
 		_, err := conn.Write(msg)
 		if err != nil {
 			log.Println(err)
