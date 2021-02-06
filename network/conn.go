@@ -3,6 +3,7 @@ package network
 import (
 	"errors"
 	"fmt"
+	"github.com/tsundata/tcp/utils"
 	"io"
 	"log"
 	"net"
@@ -77,11 +78,15 @@ func (c *Connection) StartReader() {
 			conn: c,
 			data: msg,
 		}
-		go c.messageHandler.DoMessageHandler(&req)
+		if utils.Setting.WorkerPoolSize > 0 {
+			c.messageHandler.SendMessageToTaskQueue(&req)
+		} else {
+			go c.messageHandler.DoMessageHandler(&req)
+		}
 	}
 }
 
-func (c *Connection) StartWriter()  {
+func (c *Connection) StartWriter() {
 	log.Println("writer goroutine is running")
 	defer log.Println(c.RemoteAddr(), " conn writer exit")
 

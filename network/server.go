@@ -52,20 +52,25 @@ func (s *Server) Start() {
 		utils.Setting.MaxPacketSize,
 	)
 	go func() {
+		// start worker pool
+		s.messageHandler.StartWorkerPool()
+
+		// addr
 		addr, err := net.ResolveTCPAddr(s.IPVersion, fmt.Sprintf("%s:%d", s.IP, s.Port))
 		if err != nil {
 			log.Println(err)
 			return
 		}
+		// listen
 		lis, err := net.ListenTCP(s.IPVersion, addr)
 		if err != nil {
 			log.Println(err)
 			return
 		}
 
+		// accept
 		var cid uint32
 		cid = 0
-
 		for {
 			conn, err := lis.AcceptTCP()
 			if err != nil {
