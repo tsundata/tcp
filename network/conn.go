@@ -16,29 +16,36 @@ type IConnection interface {
 	GetConnID() uint32
 	RemoteAddr() net.Addr
 	SendMessage(uint32, []byte) error
+	SendBuffMessage(uint32, []byte) error
 }
 
 type HandFunc func(*net.TCPConn, []byte, int) error
 
 type Connection struct {
-	Conn     *net.TCPConn
-	ConnID   uint32
-	isClosed bool
+	TCPServer IServer
+	Conn      *net.TCPConn
+	ConnID    uint32
+	isClosed  bool
 
-	messageHandler IMessageHandle
-	ExitBuffChan   chan bool
-	messageChan    chan []byte
+	messageHandler  IMessageHandle
+	ExitBuffChan    chan bool
+	messageChan     chan []byte
+	messageBuffChan chan []byte
 }
 
-func NewConnection(conn *net.TCPConn, connID uint32, h IMessageHandle) *Connection {
-	return &Connection{
-		Conn:           conn,
-		ConnID:         connID,
-		isClosed:       false,
-		messageHandler: h,
-		ExitBuffChan:   make(chan bool, 1),
-		messageChan:    make(chan []byte),
+func NewConnection(server IServer, conn *net.TCPConn, connID uint32, h IMessageHandle) *Connection {
+	c := &Connection{
+		TCPServer:       server,
+		Conn:            conn,
+		ConnID:          connID,
+		isClosed:        false,
+		messageHandler:  h,
+		ExitBuffChan:    make(chan bool, 1),
+		messageChan:     make(chan []byte),
+		messageBuffChan: make(chan []byte, utils.Setting.MaxMessageChanLen),
 	}
+	c.TCPServer.GetConnManager().Add(c)
+	return c
 }
 
 func (c *Connection) StartReader() {
@@ -97,6 +104,16 @@ func (c *Connection) StartWriter() {
 				log.Println("send data error ", err, " conn writer exit")
 				return
 			}
+		case data, ok := <-c.messageBuffChan:
+			if ok {
+				if _, err := c.Conn.Write(data); err != nil {
+					log.Println("send buff data error ", err, " conn writer exit")
+					return
+				}
+			} else {
+				log.Println("messageBuffChan is Closed")
+				break
+			}
 		case <-c.ExitBuffChan:
 			return
 		}
@@ -106,6 +123,9 @@ func (c *Connection) StartWriter() {
 func (c *Connection) Start() {
 	go c.StartReader()
 	go c.StartWriter()
+
+	// hook start
+	c.TCPServer.CallOnConnStart(c)
 
 	for {
 		select {
@@ -121,6 +141,9 @@ func (c *Connection) Stop() {
 	}
 	c.isClosed = true
 
+	// hook stop
+	c.TCPServer.CallOnConnStop(c)
+
 	err := c.Conn.Close()
 	if err != nil {
 		log.Println(err)
@@ -129,7 +152,10 @@ func (c *Connection) Stop() {
 
 	c.ExitBuffChan <- true
 
+	c.TCPServer.GetConnManager().Remove(c)
+
 	close(c.ExitBuffChan)
+	close(c.messageBuffChan)
 }
 
 func (c *Connection) GetTCPConnection() *net.TCPConn {
@@ -158,6 +184,24 @@ func (c *Connection) SendMessage(id uint32, data []byte) error {
 
 	// write
 	c.messageChan <- msg
+
+	return nil
+}
+
+func (c *Connection) SendBuffMessage(id uint32, data []byte) error {
+	if c.isClosed {
+		return errors.New("connection closed when send buff message")
+	}
+
+	pack := NewPack()
+	msg, err := pack.Pack(NewMessage(id, data))
+	if err != nil {
+		log.Println("pack error message id = ", id)
+		return errors.New("pack error message")
+	}
+
+	// write
+	c.messageBuffChan <- msg
 
 	return nil
 }

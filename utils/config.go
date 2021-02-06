@@ -11,10 +11,11 @@ type Config struct {
 	TCPPort int    `json:"port"`
 	Version string `json:"version"`
 
-	MaxPacketSize    uint32 `json:"max_packet_size"`
-	MaxConn          int    `json:"max_conn"`
-	WorkerPoolSize   uint32 `json:"worker_pool_size"`
-	MaxWorkerTaskLen uint32 `json:"max_worker_task_len"`
+	MaxPacketSize     uint32 `json:"max_packet_size"`
+	MaxConn           int    `json:"max_conn"`
+	WorkerPoolSize    uint32 `json:"worker_pool_size"`
+	MaxWorkerTaskLen  uint32 `json:"max_worker_task_len"`
+	MaxMessageChanLen uint32 `json:"max_message_chan_len"`
 }
 
 var Setting *Config
@@ -33,14 +34,15 @@ func (c *Config) Reload() {
 
 func init() {
 	Setting = &Config{
-		Name:             "server",
-		Host:             "0.0.0.0",
-		TCPPort:          5678,
-		Version:          "v0.1",
-		MaxPacketSize:    4096,
-		MaxConn:          12000,
-		WorkerPoolSize:   10,
-		MaxWorkerTaskLen: 1024,
+		Name:              "server",
+		Host:              "0.0.0.0",
+		TCPPort:           5678,
+		Version:           "v0.1",
+		MaxPacketSize:     4096,
+		MaxConn:           2,
+		WorkerPoolSize:    10,
+		MaxWorkerTaskLen:  1024,
+		MaxMessageChanLen: 1024,
 	}
 	Setting.Reload()
 }

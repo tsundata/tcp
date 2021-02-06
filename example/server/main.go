@@ -29,9 +29,26 @@ func (r *HelloRouter) Handle(req network.IRequest) {
 	}
 }
 
+func DoConnBegin(conn network.IConnection)  {
+	log.Println("DoConnBegin ...")
+	err := conn.SendMessage(2, []byte("DoConnBegin..."))
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+func DoConnLost(conn network.IConnection)  {
+	log.Println("DoConnLost ...")
+}
+
 func main() {
-	s := network.NewServer("example")
+	s := network.NewServer()
+
+	s.SetOnConnStart(DoConnBegin)
+	s.SetOnConnStop(DoConnLost)
+
 	s.AddRouter(0, &PingRouter{})
 	s.AddRouter(1, &HelloRouter{})
+
 	s.Serve()
 }

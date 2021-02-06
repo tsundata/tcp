@@ -12,6 +12,11 @@ type IServer interface {
 	Stop()
 	Serve()
 	AddRouter(uint32, IRouter)
+	GetConnManager() IConnManager
+	SetOnConnStart(func(IConnection))
+	SetOnConnStop(func(IConnection))
+	CallOnConnStart(IConnection)
+	CallOnConnStop(IConnection)
 }
 
 type Server struct {
@@ -21,9 +26,13 @@ type Server struct {
 	Port      int
 
 	messageHandler IMessageHandle
+	ConnManager    IConnManager
+
+	OnConnStart func(conn IConnection)
+	OnConnStop  func(conn IConnection)
 }
 
-func NewServer(name string) IServer {
+func NewServer() IServer {
 	utils.Setting.Reload()
 	return &Server{
 		Name:           utils.Setting.Name,
@@ -31,17 +40,8 @@ func NewServer(name string) IServer {
 		IP:             utils.Setting.Host,
 		Port:           utils.Setting.TCPPort,
 		messageHandler: NewMessageHandle(),
+		ConnManager:    NewConnManager(),
 	}
-}
-
-func CallbackToClient(conn *net.TCPConn, data []byte, cnt int) error {
-	log.Printf("[TS] conn handle...")
-	_, err := conn.Write(data[:cnt])
-	if err != nil {
-		log.Println("write back buf err ", err)
-		return err
-	}
-	return nil
 }
 
 func (s *Server) Start() {
@@ -78,7 +78,12 @@ func (s *Server) Start() {
 				continue
 			}
 
-			dealConn := NewConnection(conn, cid, s.messageHandler)
+			if s.ConnManager.Len() >= utils.Setting.MaxConn {
+				_ = conn.Close()
+				continue
+			}
+
+			dealConn := NewConnection(s, conn, cid, s.messageHandler)
 			cid++
 
 			go dealConn.Start()
@@ -87,7 +92,8 @@ func (s *Server) Start() {
 }
 
 func (s *Server) Stop() {
-	// TODO
+	log.Println("[TS] stop server, name ", s.Name)
+	s.ConnManager.ClearConn()
 }
 
 func (s *Server) Serve() {
@@ -99,4 +105,30 @@ func (s *Server) Serve() {
 func (s *Server) AddRouter(id uint32, r IRouter) {
 	s.messageHandler.AddRouter(id, r)
 	log.Println("add router success")
+}
+
+func (s *Server) GetConnManager() IConnManager {
+	return s.ConnManager
+}
+
+func (s *Server) SetOnConnStart(f func(IConnection)) {
+	s.OnConnStart = f
+}
+
+func (s *Server) SetOnConnStop(f func(IConnection)) {
+	s.OnConnStop = f
+}
+
+func (s *Server) CallOnConnStart(conn IConnection) {
+	if s.OnConnStart != nil {
+		log.Println("call on conn start...")
+		s.OnConnStart(conn)
+	}
+}
+
+func (s *Server) CallOnConnStop(conn IConnection) {
+	if s.OnConnStop != nil {
+		log.Println("call on conn stop...")
+		s.OnConnStop(conn)
+	}
 }
